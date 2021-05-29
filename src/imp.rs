@@ -45,7 +45,7 @@ impl _ErrFuncs for _Err
           =
     [104, 128, 220]
  */
-priv fn generate(mut from_rgb: u8) -> u8
+fn generate(mut from_rgb: u8) -> u8
 {
     from_rgb <<= 1;
     from_rgb ^= 2;
