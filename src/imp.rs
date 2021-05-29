@@ -1,92 +1,129 @@
+use super::pixel;
+
+use self::pixel::BmpFileInfo;
+use self::pixel::BmpFileInfoFuncs;
+use self::pixel::_Err;
+use self::pixel::_ErrFuncs;
+
+use std::fs;
 use std::fs::File;
-use std::io::Write;
 use std::io;
+use std::io::Read;
+use std::env;
+use std::path::PathBuf;
 
-use super::render;
-use self::render::BmpImg;
-use self::render::BmpImgFuncs;
-use self::render::FileErrors;
-use self::render::FileErrorsFuncs;
-
-use self::render::PixelErrors;
-use self::render::PixelErrorsFuncs;
-
-impl PixelErrorsFuncs for PixelErrors
+impl From<io::Error> for _Err
 {
-    fn invalid_pixel(pixel: char) -> PixelErrors
+    fn from(err: io::Error) -> _Err
     {
-        PixelErrors::InvalidPixel(pixel)
-    }
-    fn unknown_pixel(pixel: char) -> PixelErrors
-    {
-        PixelErrors::UnknownPixel(pixel)
+        _Err::NoSuchFile(err)
     }
 }
 
-impl FileErrorsFuncs for FileErrors {
-    fn err(err: io::Error) -> FileErrors
+impl _ErrFuncs for _Err
+{
+    fn invalid_start(start: Vec<u8>) -> _Err
     {
-        FileErrors::FileErr(err)
+        _Err::InvalidStart(start)
+    }
+    fn invalid_rgb(rgb: char) -> _Err
+    {
+        _Err::InvalidRGB(rgb)
+    }
+    fn invalid_size(size: i32) -> _Err
+    {
+        _Err::InvalidSize(size)
     }
 }
 
-impl BmpImgFuncs for BmpImg
+/*
+ * This function will generate a new rgb value for the current pixel
+ * depending on the current rgb value.
+
+ Example:
+    [53, 65, 239]
+          =
+    [104, 128, 220]
+ */
+priv fn generate(mut from_rgb: u8) -> u8
 {
-    fn new_bmp() -> Self {
-        Self {
-            info_header: vec!['B', 'M'],
-            header: vec![
-                0, 0x00,
-                0x36, 0x28,
-                0, 0, // width, height
-                0x1800a1,
-                0, 0,
-                0x002e23, 0x002e23, 0
-            ],
-            bmp_image: Vec::new()
-        }
-    }
+    from_rgb <<= 1;
+    from_rgb ^= 2;
 
-    fn check_pixel(&mut self, pixel: u8) -> Result<char, PixelErrors>
+    from_rgb
+}
+
+impl BmpFileInfoFuncs for BmpFileInfo
+{
+    /*
+     * Initialize the BmpFileInfo struct to have information
+     * about the BMP file.
+     *
+     * Error if the file doesn't exist.
+     */
+    fn new(filename: String, info_header: Vec<u8>) -> Result<BmpFileInfo, _Err>
     {
-        if pixel < 10 || pixel > 250 {
-            if !(pixel == 0x00)
-            {
-                return Err(PixelErrors::invalid_pixel(pixel as char));
-            }
-        }
 
-        return Ok(pixel as char);
-    }
+        let path: PathBuf = env::current_dir()?.to_path_buf().join(filename);
 
-    fn assign(&mut self, pixels: Vec<char>) -> Result<BmpImg, PixelErrors>
-    {
-        self.bmp_image = pixels;
+        let mut info = BmpFileInfo{
+            path: path,
+            got: Vec::new(),
+            rgb_vals: Vec::new()
+        };
 
-        for i in 0..self.bmp_image.len()
+        if info.path.clone().exists()
         {
-            match self.check_pixel(self.bmp_image[i] as u8) {
-                Ok(_) => {}
-                Err(e) => return Err(e)
+            let mut f = File::open(info.path.clone()).expect("No such file");
+
+            let meta = fs::metadata(info.path.clone()).expect("cannot read metadata");
+
+            let mut buffer = vec![0; meta.len() as usize];
+            f.read(&mut buffer).expect("Couldn't read");
+
+            info.got = buffer;
+
+            let mut arr: Vec<u8> = Vec::new();
+
+            for i in 0..info_header.len() {
+                if !(info.got[i] == info_header[i])
+                {
+                    arr.push(info.got[i]);
+                    if i == info_header.len() - 1
+                    {
+                        return Err(_Err::InvalidStart(arr))
+                    }
+                }
             }
         }
-        Ok(self.clone())
+
+        Ok(info)
     }
 
-    fn write_image(&mut self) -> Result<BmpImg, FileErrors>
+    fn read_data(&mut self)
     {
-        match File::create("img.bmp".to_string()) {
-            Ok(mut f) => {
-                let mut image: Vec<u8> = Vec::new();
+        let start_of_pixel_array = self.got[2] as usize;
+        let mut index = start_of_pixel_array;
 
-                for i in 0..self.bmp_image.len() {
-                    image.push(i as u8);
-                }
-                f.write_all(&image);
-            },
-            Err(e) => return Err(FileErrors::err(e))
+        let mut pixel_array: Vec<u8> = Vec::new();
+
+        while self.got[index] != 0x00
+        {
+            pixel_array.push(self.got[index]);
+            index += 1;
         }
 
-        Ok(self.clone())
+        self.rgb_vals = pixel_array;
+    }
+
+    /*
+     * This will take the rgb values and generate new rgb pixel
+     * values, dependable.
+     */
+    fn mult(&mut self)
+    {
+        for i in 0..self.rgb_vals.len() {
+            self.rgb_vals[i] = generate(self.rgb_vals[i]);
+        }
     }
 }

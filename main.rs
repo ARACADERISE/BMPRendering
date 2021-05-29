@@ -1,20 +1,15 @@
 mod src;
 
-use src::render;
-use self::render::BmpImg;
-use self::render::BmpImgFuncs;
+use self::src::pixel;
+use self::pixel::BmpFileInfo;
+use self::pixel::BmpFileInfoFuncs;
 
 fn main() {
-  let mut bmp_info = BmpImg::new_bmp();
-  match bmp_info.assign(vec![
-      0x35 as char,
-      0x41 as char,
-      0xef as char,
-      0x00 as char
-  ]) {
-      Ok(t) => {
-          bmp_info.write_image();   
-      },
-      Err(e) => panic!("{:?}", e)
-  }
+    match BmpFileInfo::new("img.bmp".to_string(), vec!['B' as u8, 'M' as u8]) {
+        Ok(mut t) => {
+            t.read_data();
+            t.mult();
+        },
+        Err(e) => panic!("{:?}", e)
+    }
 }
