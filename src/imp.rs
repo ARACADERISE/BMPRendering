@@ -62,7 +62,7 @@ fn generate_offset(mut from_rgb: u8, mut offset: u8) -> u8
         offset -= from_rgb;
     }
 
-    from_rgb <<= offset;
+    from_rgb >>= offset;
     from_rgb &= (from_rgb << offset);
 
     return from_rgb;
@@ -139,7 +139,20 @@ impl BmpFileInfoFuncs for BmpFileInfo
     {
         println!("{:?}", self.rgb_vals);
         for i in 0..self.rgb_vals.len() {
-            self.rgb_vals[i] = generate_offset(self.rgb_vals[i], 2);
+            if !(i == self.rgb_vals.len())
+            {
+                if !(i + 1 == self.rgb_vals.len())
+                {
+                    if self.rgb_vals[i] < self.rgb_vals[i + 1]
+                    {
+                        self.rgb_vals[i] = generate_offset(self.rgb_vals[i], 2);
+                    } else {
+                        self.rgb_vals[i] = generate(self.rgb_vals[i]);
+                    }
+                }else {
+                    self.rgb_vals[i] = generate(self.rgb_vals[i]);
+                }
+            }
         }
         println!("{:?}", self.rgb_vals);
     }
