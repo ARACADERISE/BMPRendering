@@ -137,7 +137,6 @@ impl BmpFileInfoFuncs for BmpFileInfo
      */
     fn mult(&mut self)
     {
-        println!("{:?}", self.rgb_vals);
         for i in 0..self.rgb_vals.len() {
             if !(i == self.rgb_vals.len())
             {
@@ -154,6 +153,5 @@ impl BmpFileInfoFuncs for BmpFileInfo
                 }
             }
         }
-        println!("{:?}", self.rgb_vals);
     }
 }
